@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Express 14 for Windows Desktop
+VisualStudioVersion = 14.0.25420.1
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "oRegex", "oRegex.vcxproj", "{D377AD87-8C8E-47F3-987D-428CF82E73FF}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		UNICODE Debug|x64 = UNICODE Debug|x64
+		UNICODE Debug|x86 = UNICODE Debug|x86
+		UNICODE Release|x64 = UNICODE Release|x64
+		UNICODE Release|x86 = UNICODE Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D377AD87-8C8E-47F3-987D-428CF82E73FF}.UNICODE Debug|x64.ActiveCfg = UNICODE Debug|x64
+		{D377AD87-8C8E-47F3-987D-428CF82E73FF}.UNICODE Debug|x64.Build.0 = UNICODE Debug|x64
+		{D377AD87-8C8E-47F3-987D-428CF82E73FF}.UNICODE Debug|x86.ActiveCfg = UNICODE Debug|Win32
+		{D377AD87-8C8E-47F3-987D-428CF82E73FF}.UNICODE Debug|x86.Build.0 = UNICODE Debug|Win32
+		{D377AD87-8C8E-47F3-987D-428CF82E73FF}.UNICODE Release|x64.ActiveCfg = UNICODE Release|x64
+		{D377AD87-8C8E-47F3-987D-428CF82E73FF}.UNICODE Release|x64.Build.0 = UNICODE Release|x64
+		{D377AD87-8C8E-47F3-987D-428CF82E73FF}.UNICODE Release|x86.ActiveCfg = UNICODE Release|Win32
+		{D377AD87-8C8E-47F3-987D-428CF82E73FF}.UNICODE Release|x86.Build.0 = UNICODE Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

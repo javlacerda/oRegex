@@ -1,0 +1,3 @@
+LIBRARY oRegex
+EXPORTS oRegexWndProc  @1
+ 
