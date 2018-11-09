@@ -248,7 +248,7 @@
       <OutputFile>.\UDeb/oRegex.bsc</OutputFile>
     </Bscmake>
     <PostBuildEvent>
-      <Command>XCOPY "$(OutDir)$(ProjectName).dll" "C:\DEVELOP\IDE\OS5.1.1\xcomp\" /S /Y
+      <Command>XCOPY "$(OutDir)$(ProjectName).dll" "C:\DEVELOP\IDE\OS8.1.6\xcomp\" /S /Y
 </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>

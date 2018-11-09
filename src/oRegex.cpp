@@ -31,7 +31,7 @@
 #include "oRegex.h"
 
 #define VERSION_MAJOR 1
-#define VERSION_MINOR 0
+#define VERSION_MINOR 1
 
 //--------------------------------------------------------------------------------
 // Global variables
@@ -55,15 +55,23 @@ ECOparam paramsSetFlags[] =
 ECOparam paramsMatch[] =
 {
     {7002, fftCharacter, 0, 0},
+    {7003, fftBoolean,   0, 0}
+};
+
+ECOparam paramsMatchResults[] =
+{
+    {7002, fftCharacter, 0, 0},
     {7003, fftBoolean,   0, 0},
+    {7004, fftList,      0, 0}
 };
 
 ECOmethodEvent oRegexFunctions[] =
 {
-    {cSetPatternFunction,       6000, fftBoolean,   sizeof(paramsSetPattern) / sizeof(ECOparam), paramsSetPattern, 0, 0},
-    {cSetFlagsFunction,         6001, fftBoolean,   sizeof(paramsSetFlags) / sizeof(ECOparam),   paramsSetFlags,   0, 0},
-    {cMatchFunction,            6002, fftBoolean,   sizeof(paramsSetFlags) / sizeof(ECOparam),   paramsMatch,      0, 0},
-    {cGetErrorMessageFunction,  6017, fftCharacter, 0,                                           0,                0, 0}
+    {cSetPatternFunction,      6000, fftBoolean,   sizeof(paramsSetPattern) / sizeof(ECOparam),   paramsSetPattern,   0, 0},
+    {cSetFlagsFunction,        6001, fftBoolean,   sizeof(paramsSetFlags) / sizeof(ECOparam),     paramsSetFlags,     0, 0},
+    {cMatchFunction,           6002, fftBoolean,   sizeof(paramsMatch) / sizeof(ECOparam),        paramsMatch,        0, 0},
+    {cMatchResultsFunction,    6003, fftBoolean,   sizeof(paramsMatchResults) / sizeof(ECOparam), paramsMatchResults, 0, 0},
+    {cGetErrorMessageFunction, 6017, fftCharacter, 0,                                             0,                  0, 0}
 };
 
 #define cFunctionsCount (sizeof(oRegexFunctions) / sizeof(ECOmethodEvent))
@@ -228,6 +236,9 @@ qbool ORegex::methodCall(EXTCompInfo *pEci)
         case cMatchFunction:
             rtnCode = match(pEci);
             break;
+        case cMatchResultsFunction:
+            rtnCode = matchResults(pEci);
+            break;
     }
 
     rtnVal.setBool((rtnCode == qtrue) ? preBoolTrue : preBoolFalse);
@@ -313,6 +324,87 @@ qbool ORegex::match(EXTCompInfo *pEci)
 
     return qtrue;
 }
+
+//--------------------------------------------------------------------------------
+// Calls the regex_match algorithm
+//--------------------------------------------------------------------------------
+qbool ORegex::matchResults(EXTCompInfo *pEci)
+{
+    std::wstring str;
+    std::wregex rgx;
+    std::wsmatch mtch;
+
+    if (!getParamString(pEci, 1, str)) {
+        errorMessage = L"Incorrect number of parameters.";
+        return qfalse;
+    }
+
+    EXTParamInfo *paramRet = ECOfindParamNum(pEci, 2);
+	if (!paramRet) {
+        errorMessage = L"Incorrect number of parameters.";
+        return qfalse;
+	}
+
+    EXTParamInfo *paramRetList = ECOfindParamNum(pEci, 3);
+    if (!paramRetList) {
+        errorMessage = L"Incorrect number of parameters.";
+        return qfalse;
+    }
+
+    EXTfldval fval(reinterpret_cast<qfldval>(paramRetList->mData));
+    std::unique_ptr<EXTqlist> retList(fval.getList(qfalse));
+    if (!retList.get()) {
+        errorMessage = L"Param number 3 is not a list.";
+        return qfalse;
+    }
+
+    retList->clear(listVlen);
+    retList->addCol(fftCharacter, dpFcharacter, 0, &str255(L"expression"));
+
+    try {
+        rgx.assign(pattern, buildFlagType());
+    }
+    catch (const std::regex_error &ex) {
+        char2wstring(ex.what(), errorMessage);
+        return qfalse;
+    }
+
+    EXTfldval column;
+    bool rc = std::regex_match(str, mtch, rgx);
+    if (rc) {
+        for (size_t i = 0; i < mtch.size(); ++i) {
+            //std::wssub_match sub_match = mtch[i];
+            qlong lineNumber = retList->insertRow();
+            retList->getColValRef(lineNumber, 1, column, qtrue);
+
+            str255 stringTempOmnis(mtch[i].str().c_str());
+            column.setChar(stringTempOmnis);
+        }
+    }
+
+    EXTfldval returnField(reinterpret_cast<qfldval>(paramRet->mData));
+    returnField.setBool((rc) ? preBoolTrue : preBoolFalse);
+	ECOsetParameterChanged(pEci, 2);
+
+    ECOsetParameterChanged(pEci, 3);
+
+    return qtrue;
+}
+
+std::regex::flag_type ORegex::buildFlagType()
+{
+    std::regex::flag_type flgs = std::regex::ECMAScript;
+
+    if (flags & kRegexFlagBasic)
+        flgs |= std::regex::basic;
+    if (flags & kRegexFlagExtended)
+        flgs |= std::regex::extended;
+    if (flags & kRegexFlagIcase)
+        flgs |= std::regex::icase;
+
+    return flgs;
+}
+
 
 //--------------------------------------------------------------------------------
 // Utility functions
