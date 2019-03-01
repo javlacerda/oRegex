@@ -12,6 +12,9 @@ const qlong cSetPatternFunction = 1;
 const qlong cSetFlagsFunction = 2;
 const qlong cMatchFunction = 3;
 const qlong cMatchResultsFunction = 4;
+const qlong cSearchFunction = 5;
+const qlong cReplaceFunction = 6;
+const qlong cSplitFunction = 7;
 const qlong cGetErrorMessageFunction = 18;
 
 const qlong kRegexFlagECMAScript = 0;
@@ -51,6 +54,9 @@ public:
     void getErrorMessage(EXTCompInfo *pEci);
     qbool match(EXTCompInfo *pEci);
     qbool matchResults(EXTCompInfo *pEci);
+    qbool search(EXTCompInfo *pEci);
+    qbool replace(EXTCompInfo *pEci);
+    qbool split(EXTCompInfo *pEci);
 
 private:
     std::regex:: flag_type buildFlagType();

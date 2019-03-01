@@ -31,7 +31,7 @@
 #include "oRegex.h"
 
 #define VERSION_MAJOR 1
-#define VERSION_MINOR 1
+#define VERSION_MINOR 2
 
 //--------------------------------------------------------------------------------
 // Global variables
@@ -65,13 +65,35 @@ ECOparam paramsMatchResults[] =
     {7004, fftList,      0, 0}
 };
 
+ECOparam paramsSearchResults[] =
+{
+    {7002, fftCharacter, 0, 0},
+    {7004, fftList,      0, 0}
+};
+
+ECOparam paramsReplace[] =
+{
+    {7002, fftCharacter, 0, 0},
+    {7006, fftCharacter, 0, 0},
+    {7007, fftCharacter, 0, 0}
+};
+
+ECOparam paramsSplit[] =
+{
+    {7002, fftCharacter, 0, 0},
+    {7004, fftList,      0, 0}
+};
+
 ECOmethodEvent oRegexFunctions[] =
 {
-    {cSetPatternFunction,      6000, fftBoolean,   sizeof(paramsSetPattern) / sizeof(ECOparam),   paramsSetPattern,   0, 0},
-    {cSetFlagsFunction,        6001, fftBoolean,   sizeof(paramsSetFlags) / sizeof(ECOparam),     paramsSetFlags,     0, 0},
-    {cMatchFunction,           6002, fftBoolean,   sizeof(paramsMatch) / sizeof(ECOparam),        paramsMatch,        0, 0},
-    {cMatchResultsFunction,    6003, fftBoolean,   sizeof(paramsMatchResults) / sizeof(ECOparam), paramsMatchResults, 0, 0},
-    {cGetErrorMessageFunction, 6017, fftCharacter, 0,                                             0,                  0, 0}
+    {cSetPatternFunction,      6000, fftBoolean,   sizeof(paramsSetPattern) / sizeof(ECOparam),    paramsSetPattern,    0, 0},
+    {cSetFlagsFunction,        6001, fftBoolean,   sizeof(paramsSetFlags) / sizeof(ECOparam),      paramsSetFlags,      0, 0},
+    {cMatchFunction,           6002, fftBoolean,   sizeof(paramsMatch) / sizeof(ECOparam),         paramsMatch,         0, 0},
+    {cMatchResultsFunction,    6003, fftBoolean,   sizeof(paramsMatchResults) / sizeof(ECOparam),  paramsMatchResults,  0, 0},
+    {cSearchFunction,          6004, fftBoolean,   sizeof(paramsSearchResults) / sizeof(ECOparam), paramsSearchResults, 0, 0},
+    {cReplaceFunction,         6005, fftBoolean,   sizeof(paramsReplace) / sizeof(ECOparam),       paramsReplace,       0, 0},
+    {cSplitFunction,           6006, fftBoolean,   sizeof(paramsSplit) / sizeof(ECOparam),         paramsSplit,         0, 0},
+    {cGetErrorMessageFunction, 6017, fftCharacter, 0,                                              0,                   0, 0}
 };
 
 #define cFunctionsCount (sizeof(oRegexFunctions) / sizeof(ECOmethodEvent))
@@ -239,6 +261,15 @@ qbool ORegex::methodCall(EXTCompInfo *pEci)
         case cMatchResultsFunction:
             rtnCode = matchResults(pEci);
             break;
+        case cSearchFunction:
+            rtnCode = search(pEci);
+            break;
+        case cReplaceFunction:
+            rtnCode = replace(pEci);
+            break;
+        case cSplitFunction:
+            rtnCode = split(pEci);
+            break;
     }
 
     rtnVal.setBool((rtnCode == qtrue) ? preBoolTrue : preBoolFalse);
@@ -385,11 +416,168 @@ qbool ORegex::matchResults(EXTCompInfo *pEci)
     EXTfldval returnField(reinterpret_cast<qfldval>(paramRet->mData));
     returnField.setBool((rc) ? preBoolTrue : preBoolFalse);
 	ECOsetParameterChanged(pEci, 2);
-
     ECOsetParameterChanged(pEci, 3);
-
     return qtrue;
 }
+
+//--------------------------------------------------------------------------------
+// Calls the regex_search algorithm
+//--------------------------------------------------------------------------------
+qbool ORegex::search(EXTCompInfo *pEci)
+{
+    std::wstring str;
+    std::wregex rgx;
+    std::wsmatch mtch;
+
+    if (!getParamString(pEci, 1, str)) {
+        errorMessage = L"Incorrect number of parameters.";
+        return qfalse;
+    }
+
+    EXTParamInfo *paramRetList = ECOfindParamNum(pEci, 2);
+    if (!paramRetList) {
+        errorMessage = L"Incorrect number of parameters.";
+        return qfalse;
+    }
+
+    EXTfldval fval(reinterpret_cast<qfldval>(paramRetList->mData));
+    std::unique_ptr<EXTqlist> retList(fval.getList(qfalse));
+    if (!retList.get()) {
+        errorMessage = L"Param number 2 is not a list.";
+        return qfalse;
+    }
+
+    retList->clear(listVlen);
+    retList->addCol(fftCharacter, dpFcharacter, 0, &str255(L"expression"));
+    retList->addCol(fftNumber,    dpFsinteger,  0, &str255(L"position"));
+
+    try {
+        rgx.assign(pattern, buildFlagType());
+    }
+    catch (const std::regex_error &ex) {
+        char2wstring(ex.what(), errorMessage);
+        return qfalse;
+    }
+
+    EXTfldval column;
+    int pos = 0;
+    while (std::regex_search(str, mtch, rgx)) {
+        qlong lineNumber = retList->insertRow();
+
+        retList->getColValRef(lineNumber, 1, column, qtrue);
+        str255 stringTempOmnis(mtch[0].str().c_str());
+        column.setChar(stringTempOmnis);
+
+        pos += mtch.prefix().length();
+        retList->getColValRef(lineNumber, 2, column, qtrue);
+        column.setLong(pos + 1);
+        pos += mtch[0].length();
+
+        str = mtch.suffix();
+    }
+
+	ECOsetParameterChanged(pEci, 2);
+    return qtrue;
+}
+
+//--------------------------------------------------------------------------------
+// Calls the regex_replace algorithm
+//--------------------------------------------------------------------------------
+qbool ORegex::replace(EXTCompInfo *pEci)
+{
+    std::wstring sourceStr;
+    std::wstring replacementStr;
+    std::wregex rgx;
+
+    if (!getParamString(pEci, 1, sourceStr)) {
+        errorMessage = L"Incorrect number of parameters.";
+        return qfalse;
+    }
+
+    if (!getParamString(pEci, 2, replacementStr)) {
+        errorMessage = L"Incorrect number of parameters.";
+        return qfalse;
+    }
+
+    EXTParamInfo *paramRetField = ECOfindParamNum(pEci, 3);
+	if (!paramRetField) {
+        errorMessage = L"Incorrect number of parameters.";
+        return qfalse;
+	}
+
+    try {
+        rgx.assign(pattern, buildFlagType());
+    }
+    catch (const std::regex_error &ex) {
+        char2wstring(ex.what(), errorMessage);
+        return qfalse;
+    }
+
+    std::wstring destinationStr = std::regex_replace(sourceStr, rgx, replacementStr);
+
+    EXTfldval retField(reinterpret_cast<qfldval>(paramRetField->mData));
+    CHRconvFromOs cConv(reinterpret_cast<qoschar *>(const_cast<wchar_t *>(destinationStr.c_str())));
+    retField.setChar(cConv.dataPtr(), cConv.len());
+	ECOsetParameterChanged(pEci, 3);
+    return qtrue;
+}
+
+//--------------------------------------------------------------------------------
+// Splits a string using the regex_token_iterator
+//--------------------------------------------------------------------------------
+qbool ORegex::split(EXTCompInfo *pEci)
+{
+    std::wstring str;
+    std::wregex rgx;
+
+    if (!getParamString(pEci, 1, str)) {
+        errorMessage = L"Incorrect number of parameters.";
+        return qfalse;
+    }
+
+    EXTParamInfo *paramRetList = ECOfindParamNum(pEci, 2);
+    if (!paramRetList) {
+        errorMessage = L"Incorrect number of parameters.";
+        return qfalse;
+    }
+
+    EXTfldval fval(reinterpret_cast<qfldval>(paramRetList->mData));
+    std::unique_ptr<EXTqlist> retList(fval.getList(qfalse));
+    if (!retList.get()) {
+        errorMessage = L"Param number 2 is not a list.";
+        return qfalse;
+    }
+
+    retList->clear(listVlen);
+    retList->addCol(fftCharacter, dpFcharacter, 0, &str255(L"item"));
+
+    try {
+        rgx.assign(pattern, buildFlagType());
+    }
+    catch (const std::regex_error &ex) {
+        char2wstring(ex.what(), errorMessage);
+        return qfalse;
+    }
+
+    std::wsregex_token_iterator it(str.begin(), str.end(), rgx, -1);
+    std::wsregex_token_iterator end;
+    EXTfldval column;
+
+    while (it != end) {
+        qlong lineNumber = retList->insertRow();
+        retList->getColValRef(lineNumber, 1, column, qtrue);
+        str255 stringTempOmnis(it->str().c_str());
+        column.setChar(stringTempOmnis);
+        ++it;
+    }
+
+	ECOsetParameterChanged(pEci, 2);
+    return qtrue;
+}
+
+//--------------------------------------------------------------------------------
+// Build the value for the flag parameter.
+//--------------------------------------------------------------------------------
 
 std::regex::flag_type ORegex::buildFlagType()
 {
@@ -404,7 +592,6 @@ std::regex::flag_type ORegex::buildFlagType()
 
     return flgs;
 }
-
 
 //--------------------------------------------------------------------------------
 // Utility functions
@@ -469,3 +656,23 @@ errno_t char2wstring(const char *source, std::wstring &destination)
     //destination = sstr.str();
     //return 0;
 }
+
+//--------------------------------------------------------------------------------
+// Copiar uma variável do tipo wstring para a estrutura EXTCompInfo
+//--------------------------------------------------------------------------------
+/*
+bool setChar(EXTCompInfo *pEci, const qshort paramID, const std::wstring &orig)
+{
+    EXTParamInfo *param = ECOfindParamNum(pEci, paramID);
+    if (!param)
+        return false;
+
+    EXTfldval paramTexto(reinterpret_cast<qfldval>(param->mData));
+
+    CHRconvFromOs cConv(reinterpret_cast<qoschar *>(const_cast<wchar_t *>(orig.c_str())));
+    paramTexto.setChar(cConv.dataPtr(), cConv.len());
+
+    ECOsetParameterChanged(pEci, paramID);
+    return true;
+}
+*/
